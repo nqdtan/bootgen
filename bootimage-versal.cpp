@@ -1468,6 +1468,70 @@ void VersalBootImage::ReplaceImages(void)
     uint8_t bootloaderCnt = 0;
     uint8_t PSMImageCnt = 0;
 
+    std::list<SubSysImageHeader*>::iterator itSubsysPl1; // current pl_cfi image header
+    std::list<SubSysImageHeader*>::iterator itSubsysPl2; // new pl_cfi image header
+    ImageHeader* imgPl1 = NULL; // new pl_cfi id=3 (partition image header)
+    ImageHeader* imgPl2 = NULL; // new pl_cfi id=5 (partition image header)
+    std::list<ImageHeader*>::iterator itImgPl1; // current pl_cfi id=3 (partition image header)
+    std::list<ImageHeader*>::iterator itImgPl2; // current pl_cfi id=5 (partition imag header)
+    uint8_t subsysPlCnt = 0;
+
+    for (std::list<SubSysImageHeader*>::iterator subsys = subSysImageList.begin(); subsys != subSysImageList.end(); subsys++)
+    {
+        // pl_cfi
+        if ((*subsys)->GetSubSystemId() == 0x18700000)
+        {
+            subsysPlCnt++;
+            for (std::list<ImageHeader*>::iterator img = (*subsys)->imgList.begin(); img != (*subsys)->imgList.end(); img++)
+            {
+                if (subsysPlCnt == 1) {
+                    for (std::list<PartitionHeader*>::iterator partHdr = (*img)->GetPartitionHeaderList().begin(); partHdr != (*img)->GetPartitionHeaderList().end(); partHdr++)
+                    {
+                        VersalPartitionHeader* ph = static_cast<VersalPartitionHeader*>(*partHdr);
+                        if (ph->GetPartitionUid() == 3)
+                        {
+                            itImgPl1 = img;
+                        }
+                        else if (ph->GetPartitionUid() == 5)
+                        {
+                            itImgPl2 = img;
+                        }
+                    }
+                }
+                if (subsysPlCnt == 2)
+                {
+                    if ((*img)->GetPartitionUid() == 3)
+                    {
+                        imgPl1 = *img;
+                    }
+                    else if ((*img)->GetPartitionUid() == 5)
+                    {
+                        imgPl2 = *img;
+                    }
+                }
+            }
+
+            if (subsysPlCnt == 1)
+            {
+                itSubsysPl1 = subsys;
+            }
+            else if (subsysPlCnt == 2)
+            {
+                itSubsysPl2 = subsys;
+            }
+        }
+    }
+
+    // If there are two pl_cfi image headers, we overwrite the content (partition image headers)
+    // of the existing one (in the *.pdi) with the new one
+    if (subsysPlCnt == 2) {
+        (*itSubsysPl1)->imgList.erase(itImgPl1);
+        (*itSubsysPl1)->imgList.erase(itImgPl2);
+        (*itSubsysPl1)->imgList.push_front(imgPl2);
+        (*itSubsysPl1)->imgList.push_front(imgPl1);
+        subSysImageList.erase(itSubsysPl2);
+    }
+
     for (std::list<SubSysImageHeader*>::iterator subsys = subSysImageList.begin(); subsys != subSysImageList.end(); subsys++)
     {
         for (std::list<ImageHeader*>::iterator img = (*subsys)->imgList.begin(); img != (*subsys)->imgList.end(); img++)
